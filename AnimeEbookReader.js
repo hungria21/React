@@ -1,106 +1,151 @@
-import React, { useState } from 'react';
-import { Book, Settings, Moon, Sun } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-
-const AnimeEbookReader = () => {
-  const [darkMode, setDarkMode] = useState(false);
-  const [currentFile, setCurrentFile] = useState(null);
-  const [error, setError] = useState('');
-
-  const handleFileChange = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const fileType = file.name.split('.').pop().toLowerCase();
-      if (['pdf', 'epub'].includes(fileType)) {
-        setCurrentFile(file);
-        setError('');
-      } else {
-        setError('Formato de arquivo não suportado. Por favor, use PDF ou EPUB.');
-      }
-    }
-  };
-
-  return (
-    <div className={`min-h-screen ${darkMode ? 'bg-gray-900 text-white' : 'bg-blue-50'}`}>
-      {/* Header com estilo anime */}
-      <header className="bg-purple-600 text-white p-4 shadow-lg">
-        <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Book className="w-8 h-8" />
-            <h1 className="text-2xl font-bold" style={{fontFamily: "'Segoe UI', sans-serif"}}>
-              Anime Book Reader
-            </h1>
-          </div>
-          <button
-            onClick={() => setDarkMode(!darkMode)}
-            className="p-2 rounded-full hover:bg-purple-700 transition-colors"
-          >
-            {darkMode ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
-          </button>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Pixelator</title>
+    <style>
+        /* Estilos permanecem os mesmos */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <input type="file" id="fileInput" accept="image/*">
+        <div class="upload-area" id="dropZone">
+            <p>Upload another one</p>
+            <canvas id="previewCanvas" style="display: none; max-width: 100%; border-radius: 10px;"></canvas>
         </div>
-      </header>
 
-      <main className="container mx-auto p-4">
-        {/* Área de upload */}
-        <Card className={`mb-6 ${darkMode ? 'bg-gray-800 text-white' : 'bg-white'}`}>
-          <CardContent className="p-6">
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-full max-w-xl">
-                <label
-                  className={`border-2 border-dashed ${
-                    darkMode ? 'border-purple-400' : 'border-purple-600'
-                  } rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer hover:border-purple-500 transition-colors`}
-                >
-                  <Book className="w-12 h-12 mb-4 text-purple-600" />
-                  <span className="text-lg mb-2">Arraste seu arquivo ou clique para selecionar</span>
-                  <span className="text-sm text-gray-500">Suporta PDF e EPUB</span>
-                  <input
-                    type="file"
-                    accept=".pdf,.epub"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                </label>
-              </div>
+        <div class="slider-container">
+            <span class="slider-label">How pixelated you want it</span>
+            <input type="range" 
+                   id="pixelationSlider" 
+                   min="0" 
+                   max="50" 
+                   value="0"
+                   step="1">
+        </div>
 
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              {currentFile && (
-                <div className="text-center">
-                  <p className="text-lg">
-                    Arquivo selecionado: <span className="font-bold">{currentFile.name}</span>
-                  </p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Área de visualização */}
-        <Card className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'}`}>
-          <CardContent className="p-6">
-            {currentFile ? (
-              <div className="text-center p-8">
-                <p className="text-lg mb-4">
-                  Visualizador em desenvolvimento. Em breve você poderá ler {currentFile.name} aqui!
-                </p>
-              </div>
-            ) : (
-              <div className="text-center p-8">
-                <Settings className="w-16 h-16 mx-auto mb-4 text-purple-600 animate-spin-slow" />
-                <p className="text-lg">Selecione um arquivo para começar a leitura</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </main>
+        <button class="button" id="saveButton">Save for myself</button>
     </div>
-  );
-};
 
-export default AnimeEbookReader;
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const slider = document.getElementById('pixelationSlider');
+        const saveButton = document.getElementById('saveButton');
+        const ctx = previewCanvas.getContext('2d', { willReadFrequently: true });
+
+        let originalImage = null;
+        let maxWidth = 800; // Limite máximo de largura para processamento
+        let isProcessing = false;
+        let requestId = null;
+        let fileName = 'imagem'; // Nome padrão para o arquivo
+
+        function resizeImage(image, maxWidth) {
+            const ratio = Math.min(1, maxWidth / image.width);
+            const width = image.width * ratio;
+            const height = image.height * ratio;
+            return { width, height };
+        }
+
+        function handleFile(file) {
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    originalImage = new Image();
+                    originalImage.onload = () => {
+                        const { width, height } = resizeImage(originalImage, maxWidth);
+                        previewCanvas.width = width;
+                        previewCanvas.height = height;
+                        previewCanvas.style.display = 'block';
+                        slider.value = 0;
+                        pixelateImage(0);
+                    };
+                    originalImage.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+                fileName = file.name.split('.').slice(0, -1).join('.') || 'imagem'; // Define o nome do arquivo
+            }
+        }
+
+        function pixelateImage(value) {
+            if (!originalImage || isProcessing) return;
+
+            isProcessing = true;
+
+            if (requestId) {
+                cancelAnimationFrame(requestId);
+            }
+
+            requestId = requestAnimationFrame(() => {
+                const { width, height } = previewCanvas;
+
+                ctx.clearRect(0, 0, width, height);
+
+                if (value === 0) {
+                    ctx.drawImage(originalImage, 0, 0, width, height);
+                } else {
+                    const tempCanvas = document.createElement('canvas');
+                    const tempCtx = tempCanvas.getContext('2d');
+
+                    const pixelSize = Math.max(1, Math.floor(value));
+
+                    tempCanvas.width = width / pixelSize;
+                    tempCanvas.height = height / pixelSize;
+
+                    tempCtx.drawImage(originalImage, 0, 0, tempCanvas.width, tempCanvas.height);
+
+                    ctx.imageSmoothingEnabled = false;
+
+                    ctx.drawImage(tempCanvas, 0, 0, width, height);
+                }
+
+                isProcessing = false;
+            });
+        }
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#2196f3';
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.style.borderColor = '#444';
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#444';
+            handleFile(e.dataTransfer.files[0]);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFile(e.target.files[0]);
+        });
+
+        let lastUpdate = 0;
+        const updateInterval = 1000 / 60; // 60fps
+
+        slider.addEventListener('input', (e) => {
+            const now = Date.now();
+            if (now - lastUpdate >= updateInterval) {
+                pixelateImage(e.target.value);
+                lastUpdate = now;
+            }
+        });
+
+        saveButton.addEventListener('click', () => {
+            if (previewCanvas) {
+                const link = document.createElement('a');
+                link.download = fileName.length > 3 ? `${fileName}-pixelated.png` : 'imagem.png';
+                link.href = previewCanvas.toDataURL('image/png');
+                link.click();
+            }
+        });
+    </script>
+</body>
+</html>
