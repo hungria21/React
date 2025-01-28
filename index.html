@@ -88,6 +88,10 @@
             max-width: 100%;
             border-radius: 10px;
         }
+
+        #downloadLink {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -104,6 +108,7 @@
         </div>
 
         <button class="button" id="saveButton">Download</button>
+        <a id="downloadLink" download>Download Link</a>
     </div>
 
     <script>
@@ -112,6 +117,7 @@
         const previewCanvas = document.getElementById('previewCanvas');
         const slider = document.getElementById('pixelationSlider');
         const saveButton = document.getElementById('saveButton');
+        const downloadLink = document.getElementById('downloadLink');
         const ctx = previewCanvas.getContext('2d', { willReadFrequently: true });
 
         let originalImage = null;
@@ -119,8 +125,7 @@
         let processingTimer = null;
         
         function generateFileName() {
-            const timestamp = Date.now().toString(36);
-            return `px_${timestamp}.png`;
+            return `px${Math.random().toString(36).substring(2, 8)}.png`;
         }
 
         function resizeImage(image, maxWidth) {
@@ -162,40 +167,59 @@
                     return;
                 }
 
-                const offscreenCanvas = new OffscreenCanvas(width, height);
-                const offscreenCtx = offscreenCanvas.getContext('2d');
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCanvas.width = width;
+                tempCanvas.height = height;
                 
                 const pixelSize = Math.max(1, Math.floor(value));
                 const smallWidth = width / pixelSize;
                 const smallHeight = height / pixelSize;
 
-                offscreenCtx.drawImage(originalImage, 0, 0, smallWidth, smallHeight);
+                tempCtx.drawImage(originalImage, 0, 0, smallWidth, smallHeight);
                 ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(offscreenCanvas, 0, 0, smallWidth, smallHeight, 0, 0, width, height);
+                ctx.drawImage(tempCanvas, 0, 0, smallWidth, smallHeight, 0, 0, width, height);
             }, 16);
         }
 
-        function downloadImage() {
+        function triggerDownload() {
             if (!previewCanvas) return;
             
-            previewCanvas.toBlob((blob) => {
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.download = generateFileName();
-                link.href = url;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                setTimeout(() => URL.revokeObjectURL(url), 100);
-            }, 'image/png');
+            try {
+                // Método 1: Usando toDataURL (mais compatível)
+                const dataUrl = previewCanvas.toDataURL('image/png');
+                downloadLink.href = dataUrl;
+                downloadLink.download = generateFileName();
+                downloadLink.click();
+            } catch (error) {
+                console.error('Método 1 falhou, tentando método 2', error);
+                
+                // Método 2: Usando Blob (fallback)
+                previewCanvas.toBlob((blob) => {
+                    const url = URL.createObjectURL(blob);
+                    const tempLink = document.createElement('a');
+                    tempLink.href = url;
+                    tempLink.download = generateFileName();
+                    document.body.appendChild(tempLink);
+                    tempLink.click();
+                    document.body.removeChild(tempLink);
+                    URL.revokeObjectURL(url);
+                }, 'image/png');
+            }
         }
 
+        // Event Listeners
         dropZone.onclick = () => fileInput.click();
+        
         dropZone.ondragover = (e) => {
             e.preventDefault();
             dropZone.style.borderColor = '#2196f3';
         };
-        dropZone.ondragleave = () => dropZone.style.borderColor = '#444';
+        
+        dropZone.ondragleave = () => {
+            dropZone.style.borderColor = '#444';
+        };
+        
         dropZone.ondrop = (e) => {
             e.preventDefault();
             dropZone.style.borderColor = '#444';
@@ -204,7 +228,7 @@
         
         fileInput.onchange = (e) => handleFile(e.target.files[0]);
         slider.oninput = (e) => pixelateImage(e.target.value);
-        saveButton.onclick = downloadImage;
+        saveButton.onclick = triggerDownload;
     </script>
 </body>
 </html>
